@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Powerflow Playground</title>
+  <meta name="description" content="A Newton–Raphson AC power-flow solver written from scratch, solving the IEEE 14-bus network live in your browser." />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Powerflow Playground</h1>
+    <p>A Newton–Raphson AC power-flow solver written from scratch, solving the IEEE 14-bus network in your browser. Add generation or load at any bus and watch voltages and line loadings update.</p>
+  </header>
+  <main>
+    <section class="diagram">
+      <svg id="diagram" viewBox="0 0 800 560" role="img" aria-label="One-line diagram of the IEEE 14-bus network"></svg>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i> 0.95–1.05 pu, or a generator at its set-point</span>
+        <span><i style="background:var(--warn)"></i> outside by &lt;0.02</span>
+        <span><i style="background:var(--bad)"></i> voltage violation</span>
+        <span class="sep">Lines: thickness and colour show loading vs. an illustrative rating</span>
+      </div>
+    </section>
+    <section class="panel">
+      <div id="banner" class="banner"></div>
+      <label class="ctl"><span>Bus <output id="busOut"></output></span>
+        <select id="bus"></select></label>
+      <label class="ctl"><span>Added generation / load at that bus <output id="mwOut"></output></span>
+        <input id="mw" type="range" min="-200" max="300" step="5" value="0" /></label>
+      <label class="ctl"><span>System load scaling <output id="scaleOut"></output></span>
+        <input id="scale" type="range" min="50" max="600" step="5" value="100" /></label>
+      <div class="presets">
+        <button id="solar">+200 MW solar at bus 9</button>
+        <button id="reset">Reset</button>
+      </div>
+      <dl class="stats" id="stats"></dl>
+      <details open><summary>Iteration log</summary><table id="log"></table></details>
+      <details><summary>Bus results</summary><table id="buses"></table></details>
+    </section>
+  </main>
+  <footer><p><b>Limits.</b> Balanced steady state only: no dynamics, faults or protection. Line ratings are illustrative (1.5× the base-case flow) because the public case ships without them. Generator reactive limits are not enforced. Educational, not a planning tool.</p></footer>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

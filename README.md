@@ -2,7 +2,9 @@
 
 > A Newton–Raphson AC power-flow solver written from scratch, running live in the browser.
 
-**Status:** v0.1 core built (solver verified; UI not yet visually checked in a browser) · Portfolio project #3 · see `../README.md`
+**Status:** v0.1 core built; solver verified; UI checked in real Chrome
+
+![powerflow-playground screenshot](assets/screenshot.png)
 
 ## The idea
 
@@ -51,9 +53,13 @@ Load scaling probe (all loads ×k): converges at k = 1 to 4 (min voltage 1.010 �
 
 Balanced steady-state only. No dynamics, faults or protection. Educational, not a planning tool.
 
+## Browser check
+
+Checked in real Chrome (headless, driven with puppeteer) on 2026-10-12: the base case loads green with the case's own 0.94–1.06 pu limits (an earlier 0.95–1.05 band made the reference case itself look red: found by looking at it); the +200 MW solar preset flags a high-voltage load bus (min 1.041, max 1.081 pu, Q limits not enforced); ×6 load shows the diverged state. No console errors.
+
 ## Next (tomorrow)
 
-- Check the diagram in a browser; adjust bus layout so no label overlaps a line.
+- Bus labels sit close to lines in a few places; tidy the layout.
 - Show per-line loading numbers on hover/tap; add the iteration log as a mini chart.
 - Q-limit enforcement (PV→PQ switching) so high-load results are realistic.
 - Contingency mode (click a line to trip it).
@@ -64,7 +70,7 @@ Contingency mode (click a line to trip it), IEEE 30-bus case, WebAssembly solver
 
 ## Definition of done
 
-- [ ] Hero GIF or screenshot at the top of this README
+- [x] Hero GIF or screenshot at the top of this README (static screenshot; no GIF yet)
 - [x] Live demo link or one-command run (`npm install && npm run dev`)
 - [ ] "How I know it's right" section filled in with real results
 - [ ] Tests passing in CI, badge added

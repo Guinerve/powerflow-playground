@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <link rel="icon" href="data:," />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Powerflow Playground</title>
   <meta name="description" content="A Newton–Raphson AC power-flow solver written from scratch, solving the IEEE 14-bus network live in your browser." />
@@ -16,8 +17,8 @@
     <section class="diagram">
       <svg id="diagram" viewBox="0 0 800 560" role="img" aria-label="One-line diagram of the IEEE 14-bus network"></svg>
       <div class="legend">
-        <span><i style="background:var(--ok)"></i> 0.95–1.05 pu, or a generator at its set-point</span>
-        <span><i style="background:var(--warn)"></i> outside by &lt;0.02</span>
+        <span><i style="background:var(--ok)"></i> within 0.94–1.06 pu (the case's limits), or a generator at its set-point</span>
+        <span><i style="background:var(--warn)"></i> outside by under 0.02</span>
         <span><i style="background:var(--bad)"></i> voltage violation</span>
         <span class="sep">Lines: thickness and colour show loading vs. an illustrative rating</span>
       </div>

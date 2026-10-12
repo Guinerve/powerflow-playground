@@ -57,7 +57,7 @@ Balanced steady-state only. No dynamics, faults or protection. Educational, not 
 
 ## Browser check
 
-Checked in real Chrome (headless, driven with puppeteer) on 2026-10-12: the base case loads green with the case's own 0.94–1.06 pu limits (an earlier 0.95–1.05 band made the reference case itself look red: found by looking at it); the +200 MW solar preset flags a high-voltage load bus (min 1.041, max 1.081 pu, Q limits not enforced); ×6 load shows the diverged state. No console errors.
+Checked in real Chrome (headless, driven with puppeteer) on 2026-10-12: the base case loads green with the case's own 0.94–1.06 pu limits (an earlier 0.95–1.05 band made the reference case itself look red: found by looking at it); the +200 MW solar preset flags a high-voltage load bus (min 1.041, max 1.081 pu, Q limits not enforced); ×6 load shows the diverged state. No console errors. On a 390 px touch viewport: no horizontal overflow, tapping a bus selects it, and dragging the MW slider works.
 
 ## Next (tomorrow)
 

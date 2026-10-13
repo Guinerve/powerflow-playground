@@ -1,8 +1,8 @@
 import case14 from "./case14.m?raw";
 import { parseMatpower, type Network } from "./model";
 import { solvePowerFlow, type GenResult, type Solution } from "./newton";
-import { maxLoadScale, runScenario, scaleLoads, SCENARIO_SCALE } from "./scenario";
-import { floatingBuses, outside, statusMessage, V_TOL } from "./status";
+import { applyInjection, maxLoadScale, runScenario, SCENARIO_SCALE } from "./scenario";
+import { floatingBuses, genStateLabel, outside, qBreach, statusMessage, V_TOL } from "./status";
 
 const base = parseMatpower(case14);
 
@@ -36,15 +36,8 @@ const baseSol = solvePowerFlow(base);
 const ratings = baseSol.flows.map((f) => Math.max(50, Math.ceil((1.5 * Math.max(f.sFrom, f.sTo)) / 10) * 10));
 const loadingPct = (sol: Solution, i: number) => (Math.max(sol.flows[i]!.sFrom, sol.flows[i]!.sTo) / ratings[i]!) * 100;
 
-function scenario(): Network {
-  const net = scaleLoads(base, Number(scaleIn.value) / 100);
-  const bus = net.buses.find((b) => b.id === Number(busSel.value))!;
-  // Positive MW is added generation (negative load). Negative is added load, with Q following P at about 0.95 pf.
-  const mw = Number(mwIn.value);
-  bus.pd -= mw;
-  if (mw < 0) bus.qd += -mw * 0.33;
-  return net;
-}
+/** The case as the controls set it. Positive MW is added generation, negative is added load. */
+const scenario = () => applyInjection(base, Number(scaleIn.value) / 100, Number(busSel.value), Number(mwIn.value));
 
 const fmt = (x: number, d = 1) => x.toFixed(d).replace("-", "−");
 const vTone = (v: number) => (outside(v) <= V_TOL ? "ok" : outside(v) < 0.02 ? "warn" : "bad");
@@ -100,12 +93,13 @@ function drawDiagram(net: Network, sol: Solution): void {
         : `<line class="stem" x1="${x}" y1="${y - 4}" x2="${x}" y2="${gy + 12}"/>`;
       const lim = sol.converged && isLimited(g);
       // Only possible with limits off. The slack is exempt: its limits are reported, never enforced.
-      const overCap = sol.converged && !g.withinLimits && g.state !== "slack";
+      const breach = sol.converged && g.state !== "slack" ? qBreach(g) : null;
+      const overCap = breach !== null;
       s += `<g><title>Generator at bus ${b.id}: ${g.state}${sol.converged ? `, ${fmt(g.qg)} MVAr (limits ${g.qmin} to ${g.qmax})` : ""}</title>` +
         `<circle class="gen-sym${lim ? " limited" : overCap ? " over" : ""}" cx="${gx}" cy="${gy}" r="12"/>` +
         `<path class="gen-wave" d="M${gx - 6.5} ${gy}c1.6-4 3.2-4 4.9 0s3.2 4 4.9 0"/></g>`;
       if (sol.converged) {
-        const label = `${fmt(g.qg, 0)} MVAr${lim ? `, ${g.state}` : overCap ? `, over Qmax` : ""}`;
+        const label = `${fmt(g.qg, 0)} MVAr${lim ? `, ${g.state}` : breach === "above Qmax" ? ", over Qmax" : breach === "below Qmin" ? ", under Qmin" : ""}`;
         // Above the symbol for side-mounted generators; beside it otherwise, on the left near the right edge.
         const [lx, ly, anchor] = side === "left" ? [gx, gy - 19, "middle"] : gx > 700 ? [gx - 18, gy + 4, "end"] : [gx + 18, gy + 4, "start"];
         s += `<text class="gen-q" x="${lx}" y="${ly}" style="text-anchor:${anchor}">${label}</text>`;
@@ -149,10 +143,9 @@ function drawGens(sol: Solution): void {
   if (!sol.converged) { host.innerHTML = `<p class="note">No solution, so no generator outputs.</p>`; return; }
   const rows = sol.gens.map((g) => {
     const tone = g.state === "regulating" ? "ok" : isLimited(g) ? "warn" : g.withinLimits ? "ok" : "bad";
-    const state = g.state === "slack"
-      ? (g.withinLimits ? "slack" : `slack, ${g.qg > g.qmax ? "above Qmax" : "below Qmin"}`)
-      : !g.withinLimits ? `over Qmax ×${(g.qg / g.qmax).toFixed(2)}` : g.state;
-    const off = g.qg > Q_MAX_AXIS ? `<text class="over" x="300" y="6" text-anchor="end" fill="var(--bad)">▶</text>` : "";
+    const state = genStateLabel(g);
+    const off = g.qg > Q_MAX_AXIS ? `<text class="over" x="300" y="6" text-anchor="end" fill="var(--bad)">▶</text>`
+      : g.qg < Q_MIN_AXIS ? `<text class="over" x="0" y="6" text-anchor="start" fill="var(--bad)">◀</text>` : "";
     return `<div class="gen-row" title="Bus ${g.bus}: ${fmt(g.qg)} MVAr, capability ${g.qmin} to ${g.qmax} MVAr">
       <span class="who">G${g.bus}<small>bus ${g.bus}</small></span>
       <svg viewBox="0 0 300 26" preserveAspectRatio="none" aria-hidden="true">
@@ -195,14 +188,13 @@ function drawConvergence(sol: Solution): void {
   $("#conv").innerHTML = s;
 }
 
-function report(net: Network, sol: Solution): void {
+function report(net: Network, sol: Solution, load: number): void {
   const st = statusMessage(net, sol);
   const banner = $("#banner");
   banner.className = `banner ${st.tone}`;
   banner.textContent = st.text;
 
   const dd = (k: string, v: string, note = "") => `<dt>${k}</dt><dd>${v}${note ? `<small>${note}</small>` : ""}</dd>`;
-  const load = net.buses.reduce((a, b) => a + b.pd, 0);
   if (sol.converged) {
     const lowI = sol.vm.indexOf(Math.min(...sol.vm));
     const slack = sol.gens.find((g) => g.state === "slack")!;
@@ -234,12 +226,12 @@ function update(): void {
   $("#busOut").textContent = `Bus ${busSel.value}`;
   $("#mwOut").textContent = mw === 0 ? "none" : mw > 0 ? `+${mw} MW generation` : `+${-mw} MW load`;
   $("#scaleOut").textContent = `${scaleIn.value}%`;
-  const net = scenario();
+  const { net, demandMW } = scenario();
   const sol = solvePowerFlow(net, { enforceQLimits: qlimIn.checked });
   drawDiagram(net, sol);
   drawGens(sol);
   drawConvergence(sol);
-  report(net, sol);
+  report(net, sol, demandMW);
 }
 
 function renderScenario(): void {
@@ -254,7 +246,7 @@ function renderScenario(): void {
     row("Lowest bus voltage", v(r.unlimited), v(r.limited), v(r.reference)) +
     group("Generator reactive output, MVAr") +
     r.gens.map((g) => row(`Bus ${g.bus} <small>(Qmax ${g.qmax})</small>`,
-      `<span class="over">${fmt(g.unlimitedQ)}</span>`, fmt(g.limitedQ), fmt(g.referenceQ))).join("") +
+      g.unlimitedQ > g.qmax ? `<span class="over">${fmt(g.unlimitedQ)}</span>` : fmt(g.unlimitedQ), fmt(g.limitedQ), fmt(g.referenceQ))).join("") +
     row("Slack, bus 1", fmt(r.unlimited.slackQ), fmt(r.limited.slackQ), fmt(r.reference.slackQ)) +
     group("System") +
     row("Slack real power, MW", fmt(r.unlimited.slackMW), fmt(r.limited.slackMW), fmt(r.reference.slackMW)) +

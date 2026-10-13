@@ -10,6 +10,21 @@ export function scaleLoads(base: Network, k: number): Network {
 }
 
 /**
+ * Scale every load by k, then add generation (mw > 0) or load (mw < 0) at one bus. Added load draws
+ * Q at about 0.95 power factor. Added generation is modelled as negative load, so demandMW is
+ * reported separately: it counts the loads and any added load, never the added generation.
+ */
+export function applyInjection(base: Network, k: number, busId: number, mw: number): { net: Network; demandMW: number } {
+  const net = scaleLoads(base, k);
+  const demandMW = net.buses.reduce((a, b) => a + b.pd, 0) + Math.max(-mw, 0);
+  const bus = net.buses.find((b) => b.id === busId);
+  if (!bus) throw new Error(`no bus ${busId}`);
+  bus.pd -= mw;
+  if (mw < 0) bus.qd += -mw * 0.33;
+  return { net, demandMW };
+}
+
+/**
  * Largest load scaling at which the solver still converges from a flat start, found by bisection.
  * Near the nose of the PV curve this is the solver's reach, not a certified loadability limit.
  */

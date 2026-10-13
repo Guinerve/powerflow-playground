@@ -72,3 +72,35 @@ mpc.branch = [ 1 2 0.0 0.1 0 0 0 0 0 0 1 -360 360; ];
     expect(s.reason).toBeTruthy();
   });
 });
+
+describe("MATPOWER parser", () => {
+  const caseText = (genStatus: number, branchStatus: number, shift: number) => `
+mpc.baseMVA = 100;
+mpc.bus = [
+ 1 3 0 0 0 0 1 1.0 0 0 1 1.1 0.9;
+ 2 1 50 0 0 0 1 1.0 0 0 1 1.1 0.9;
+];
+mpc.gen = [ 1 0 0 100 -100 1.0 100 1 200 0; 2 30 0 100 -100 1.0 100 ${genStatus} 200 0; ];
+mpc.branch = [
+ 1 2 0.0 0.1 0 0 0 0 0 0 1 -360 360;
+ 1 2 0.0 0.1 0 0 0 0 0 ${shift} ${branchStatus} -360 360;
+];
+`;
+
+  it("leaves out generators and branches that are out of service", () => {
+    const n = parseMatpower(caseText(0, 0, 0));
+    expect(n.gens).toHaveLength(1);
+    expect(n.branches).toHaveLength(1);
+    expect(parseMatpower(caseText(1, 1, 0)).branches).toHaveLength(2);
+  });
+
+  it("reads rows separated by semicolons on one line", () => {
+    const n = parseMatpower(caseText(1, 1, 0).replace(/;\n(?= 1 2 0\.0 0\.1 0 0 0 0 0 0 1)/, "; "));
+    expect(n.branches).toHaveLength(2);
+    expect(n.branches[1]!.x).toBe(0.1);
+  });
+
+  it("refuses phase-shifting transformers instead of solving them wrongly", () => {
+    expect(() => parseMatpower(caseText(1, 1, 30))).toThrow(/phase shift/);
+  });
+});

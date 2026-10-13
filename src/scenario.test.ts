@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import case14 from "./case14.m?raw";
 import { parseMatpower } from "./model";
-import { maxLoadScale, runScenario } from "./scenario";
+import { applyInjection, maxLoadScale, runScenario } from "./scenario";
 
 const base = parseMatpower(case14);
 
@@ -47,5 +47,25 @@ describe("loadability", () => {
   it("Q limits cut the load scaling the solver can reach from ×4.00 to ×1.76", () => {
     expect(maxLoadScale(base, false)).toBeCloseTo(4.0, 2);
     expect(maxLoadScale(base, true)).toBeCloseTo(1.76, 2);
+  });
+});
+
+describe("added generation or load at one bus", () => {
+  it("added generation does not count as negative demand", () => {
+    // 259 MW is the case's total load. Adding 200 MW of solar at bus 9 leaves demand at 259 MW.
+    const { net, demandMW } = applyInjection(base, 1, 9, 200);
+    expect(demandMW).toBeCloseTo(259, 6);
+    expect(net.buses.find((b) => b.id === 9)!.pd).toBeCloseTo(29.5 - 200, 9);
+  });
+
+  it("added load counts as demand, with Q at about 0.95 power factor", () => {
+    const { net, demandMW } = applyInjection(base, 1.4, 9, -50);
+    expect(demandMW).toBeCloseTo(259 * 1.4 + 50, 6);
+    expect(net.buses.find((b) => b.id === 9)!.qd).toBeCloseTo(16.6 * 1.4 + 50 * 0.33, 9);
+  });
+
+  it("does not change the base case", () => {
+    applyInjection(base, 2, 9, 100);
+    expect(base.buses.find((b) => b.id === 9)!.pd).toBe(29.5);
   });
 });

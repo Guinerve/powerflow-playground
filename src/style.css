@@ -67,8 +67,19 @@ h1 { margin: 0; font: 700 clamp(1.9rem, 4vw, 2.6rem)/1 var(--cond); letter-spaci
 #diagram .gen-q { font: 500 11.5px var(--cond); fill: var(--ink-2); text-anchor: middle; }
 #diagram .added { font: 600 12.5px var(--cond); fill: var(--accent); text-anchor: middle; }
 #diagram .added-arrow { fill: var(--accent); }
-#diagram .num, #diagram .v, #diagram .gen-q, #diagram .added, #diagram .void { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
-#diagram .void { stroke-width: 8px; font: 600 18px var(--cond); fill: var(--muted); text-anchor: middle; }
+#diagram .num, #diagram .v, #diagram .gen-q, #diagram .added { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+#diagram .void-box { fill: var(--surface); stroke: var(--bad); stroke-width: 1.5; }
+#diagram .void { font: 700 19px var(--cond); fill: var(--ink); text-anchor: middle; }
+#diagram .void-sub { font: 400 14px var(--sans); fill: var(--ink-2); text-anchor: middle; }
+/* On a phone the 800-unit drawing shrinks to under half size, so set its labels larger. */
+@media (max-width: 600px) {
+  #diagram .num { font-size: 21px; }
+  #diagram .v { font-size: 16px; }
+  #diagram .gen-q { font-size: 15px; }
+  #diagram .added { font-size: 17px; }
+  #diagram .void { font-size: 26px; }
+  #diagram .void-sub { font-size: 18px; }
+}
 
 .key { list-style: none; margin: 4px 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); }
 .key li { display: flex; align-items: center; gap: 7px; }

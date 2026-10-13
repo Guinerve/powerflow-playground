@@ -19,7 +19,7 @@ const NUM: Record<number, Place> = {
   1: [0, -15, "middle"], 3: [37, 0, "start"], 4: [0, -15, "middle"], 6: [-14, -15, "middle"],
   8: [37, 0, "start"], 10: [-30, -15, "middle"], 14: [0, -16, "middle"],
 };
-const VOLT: Record<number, Place> = { 2: [7, 23, "middle"], 5: [24, 23, "middle"], 6: [-28, 22, "middle"], 7: [-30, 22, "middle"], 9: [34, -10, "start"] };
+const VOLT: Record<number, Place> = { 2: [-8, -13, "end"], 10: [34, -10, "start"], 5: [24, 23, "middle"], 6: [-28, 22, "middle"], 7: [-30, 22, "middle"], 9: [34, -10, "start"] };
 /** Load arrows hang off the right end of the bar unless that side is crowded. */
 const LOAD_DX: Record<number, number> = { 5: -22, 9: -22 };
 
@@ -117,7 +117,7 @@ function drawDiagram(net: Network, sol: Solution): void {
     s += `<g class="bus${b.id === sel ? " sel" : ""}" data-bus="${b.id}" tabindex="0" role="button" aria-label="Bus ${b.id}${sol.converged ? `, ${v.toFixed(3)} per unit` : ""}">` +
       `<rect class="hit" x="${x - 48}" y="${y - 20}" width="96" height="40"/>` +
       `<rect class="bar" x="${x - 30}" y="${y - 4.5}" width="60" height="9" rx="1.5" fill="${fill}"/>${label}</g>`;
-    s += `<text class="v${flag ? " flag" : ""}" x="${x + vdx}" y="${y + vdy}" style="text-anchor:${vanc}">${sol.converged ? `${arrow}${v.toFixed(3)}` : "—"}</text>`;
+    if (sol.converged) s += `<text class="v${flag ? " flag" : ""}" x="${x + vdx}" y="${y + vdy}" style="text-anchor:${vanc}">${arrow}${v.toFixed(3)}</text>`;
 
     if (b.id === sel && Number(mwIn.value) !== 0) {
       const mw = Number(mwIn.value);
@@ -125,7 +125,11 @@ function drawDiagram(net: Network, sol: Solution): void {
     }
   });
 
-  if (!sol.converged) s += `<text class="void" x="400" y="300">No solution found, so voltages and flows are hidden</text>`;
+  if (!sol.converged) {
+    s += `<rect class="void-box" x="170" y="280" width="460" height="54" rx="4"/>` +
+      `<text class="void" x="400" y="303">No solution found</text>` +
+      `<text class="void-sub" x="400" y="324">Voltages and flows stay hidden until the case solves.</text>`;
+  }
   svg.innerHTML = s;
   svg.querySelectorAll<SVGGElement>(".bus").forEach((el) => {
     const pick = () => { busSel.value = el.dataset.bus!; update(); svg.querySelector<SVGGElement>(`.bus[data-bus="${el.dataset.bus}"]`)?.focus(); };

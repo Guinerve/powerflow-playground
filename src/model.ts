@@ -20,6 +20,7 @@ export interface Gen {
   qmax: number;
   qmin: number;
   vg: number;
+  pmax: number;
 }
 export interface Branch {
   from: number;
@@ -55,7 +56,7 @@ export function parseMatpower(text: string): Network {
     id: r[0]!, type: typeOf(r[1]!), pd: r[2]!, qd: r[3]!, gs: r[4]!, bs: r[5]!, vm: r[7]!, va: r[8]!,
   }));
   const gens = matrix("gen").map((r): Gen => ({
-    bus: r[0]!, pg: r[1]!, qg: r[2]!, qmax: r[3]!, qmin: r[4]!, vg: r[5]!,
+    bus: r[0]!, pg: r[1]!, qg: r[2]!, qmax: r[3]!, qmin: r[4]!, vg: r[5]!, pmax: r[8]!,
   }));
   const branches = matrix("branch").map((r): Branch => ({
     from: r[0]!, to: r[1]!, r: r[2]!, x: r[3]!, b: r[4]!, tap: r[8] === 0 ? 1 : r[8]!,

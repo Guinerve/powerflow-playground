@@ -97,7 +97,8 @@ describe("generator reactive limits on the IEEE 14-bus case", () => {
   });
 
   it("limits are self-consistent across a sweep of load levels", () => {
-    for (let k = 0.5; k <= 1.6; k += 0.05) {
+    for (let j = 10; j <= 32; j++) {
+      const k = j / 20; // 0.50 to 1.60
       const s = solvePowerFlow(scaled(k), { enforceQLimits: true });
       expect(s.converged, `load ×${k.toFixed(2)}`).toBe(true);
       expectConsistentLimits(s);

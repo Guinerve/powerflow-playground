@@ -2,45 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="data:," />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='14' width='24' height='5' rx='1' fill='%2317262E'/%3E%3Ccircle cx='16' cy='8' r='5' fill='none' stroke='%2317262E' stroke-width='2'/%3E%3Cpath d='M16 13v1M9 19v8M23 19v8' stroke='%2317262E' stroke-width='2'/%3E%3C/svg%3E" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Powerflow Playground</title>
-  <meta name="description" content="A Newton–Raphson AC power-flow solver written from scratch, solving the IEEE 14-bus network live in your browser." />
+  <meta name="description" content="A Newton–Raphson AC power-flow solver written from scratch, with generator reactive limits, solving the IEEE 14-bus network live in your browser." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <header>
-    <h1>Powerflow Playground</h1>
-    <p>A Newton–Raphson AC power-flow solver written from scratch, solving the IEEE 14-bus network in your browser. Add generation or load at any bus and watch voltages and line loadings update.</p>
+  <header class="top">
+    <div>
+      <h1>Powerflow Playground</h1>
+      <p>A Newton–Raphson AC power-flow solver, written from scratch, solving the IEEE 14-bus network every time you move a control.</p>
+    </div>
+    <nav>
+      <a href="#scenario">Worked scenario</a>
+      <a href="https://github.com/Guinerve/powerflow-playground">Source on GitHub</a>
+    </nav>
   </header>
-  <main>
-    <section class="diagram">
-      <svg id="diagram" viewBox="0 0 800 560" role="img" aria-label="One-line diagram of the IEEE 14-bus network"></svg>
-      <div class="legend">
-        <span><i style="background:var(--ok)"></i> within 0.94–1.06 pu (the case's limits), or a generator at its set-point</span>
-        <span><i style="background:var(--warn)"></i> outside by under 0.02</span>
-        <span><i style="background:var(--bad)"></i> voltage violation</span>
-        <span class="sep">Lines: thickness and colour show loading vs. an illustrative rating</span>
-      </div>
+
+  <main class="workbench">
+    <section class="drawing" aria-labelledby="drawing-h">
+      <h2 id="drawing-h" class="visually-hidden">One-line diagram</h2>
+      <svg id="diagram" viewBox="0 0 800 570" role="group" aria-label="One-line diagram of the IEEE 14-bus network. Select a bus to add generation or load there."></svg>
+      <ul class="key">
+        <li><i class="bar ok"></i>Bus inside 0.94–1.06 pu</li>
+        <li><i class="bar warn"></i>Outside by less than 0.02 pu</li>
+        <li><i class="bar bad"></i>Voltage violation</li>
+        <li><i class="bar held"></i>Generator holding its set-point</li>
+        <li><svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8" class="k-gen"/><path d="M6.5 11c1.5-3.5 3-3.5 4.5 0s3 3.5 4.5 0" class="k-gen"/></svg>Generator</li>
+        <li><svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8" class="k-gen k-lim"/></svg>Generator at a reactive limit</li>
+        <li><svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="8" cy="11" r="5.5" class="k-gen"/><circle cx="14" cy="11" r="5.5" class="k-gen"/></svg>Transformer</li>
+        <li class="wide">Lines use the same colours for loading against an illustrative rating: green under 70%, amber 70–100%, red over 100%. Width grows with loading; the arrow shows which way real power flows.</li>
+      </ul>
     </section>
-    <section class="panel">
-      <div id="banner" class="banner"></div>
-      <label class="ctl"><span>Bus <output id="busOut"></output></span>
-        <select id="bus"></select></label>
-      <label class="ctl"><span>Added generation / load at that bus <output id="mwOut"></output></span>
-        <input id="mw" type="range" min="-200" max="300" step="5" value="0" /></label>
-      <label class="ctl"><span>System load scaling <output id="scaleOut"></output></span>
-        <input id="scale" type="range" min="50" max="600" step="5" value="100" /></label>
-      <div class="presets">
-        <button id="solar">+200 MW solar at bus 9</button>
-        <button id="reset">Reset</button>
+
+    <aside class="panel">
+      <p id="banner" class="banner" role="status" aria-live="polite"></p>
+
+      <div class="controls">
+        <label class="ctl"><span>Bus <output id="busOut"></output></span>
+          <select id="bus"></select></label>
+        <label class="ctl"><span>Add generation or load there <output id="mwOut"></output></span>
+          <input id="mw" type="range" min="-200" max="300" step="5" value="0" /></label>
+        <label class="ctl"><span>System load <output id="scaleOut"></output></span>
+          <input id="scale" type="range" min="50" max="600" step="5" value="100" /></label>
+        <label class="switch"><input id="qlim" type="checkbox" checked />
+          <span><b>Enforce generator reactive limits</b>
+          A generator that can't hold its voltage set-point within Qmin–Qmax is pinned at the limit and its voltage floats.</span></label>
+        <div class="presets">
+          <button type="button" id="preset-load">140% load</button>
+          <button type="button" id="preset-solar">+200 MW solar at bus 9</button>
+          <button type="button" id="reset">Reset</button>
+        </div>
       </div>
+
       <dl class="stats" id="stats"></dl>
-      <details open><summary>Iteration log</summary><table id="log"></table></details>
-      <details><summary>Bus results</summary><table id="buses"></table></details>
-    </section>
+
+      <section class="block">
+        <h2>Generator reactive power</h2>
+        <p class="note">The shaded band is each machine's capability, Qmin to Qmax. The tick is what the solution asks of it.</p>
+        <div id="gens" class="gens"></div>
+      </section>
+
+      <section class="block">
+        <h2>Convergence</h2>
+        <p class="note">Largest power mismatch after each Newton step, log scale. The error roughly squares each step until it drops under the 10⁻⁸ pu tolerance.</p>
+        <svg id="conv" viewBox="0 0 320 150" role="img" aria-label="Mismatch per Newton iteration"></svg>
+        <details><summary>Iteration log</summary><table id="log"></table></details>
+        <details><summary>Bus results</summary><table id="buses"></table></details>
+      </section>
+    </aside>
   </main>
-  <footer><p><b>Limits.</b> Balanced steady state only: no dynamics, faults or protection. Line ratings are illustrative (1.5× the base-case flow) because the public case ships without them. Generator reactive limits are not enforced. Educational, not a planning tool.</p></footer>
+
+  <section id="scenario" class="scenario" aria-labelledby="scenario-h">
+    <h2 id="scenario-h">What 40% more load does when generators run out of reactive power</h2>
+    <p class="lede">Scale every load in the IEEE 14-bus case to 140% and solve it twice: once letting generators produce whatever reactive power it takes to hold their voltage set-points, and once holding them to their real Qmin–Qmax. The second solve is checked against <a href="https://www.pandapower.org/">pandapower</a>, an independent open-source solver, run on the same case file.</p>
+    <div class="scenario-grid">
+      <div class="table-wrap"><table id="compare" class="compare"></table></div>
+      <div class="reading" id="reading"></div>
+    </div>
+    <p><button type="button" id="preset-load-2">Load this scenario into the diagram</button></p>
+  </section>
+
+  <footer>
+    <p><b>Limits.</b> Balanced steady state only: no dynamics, faults or protection. Line ratings are illustrative (1.5× the base-case flow, at least 50 MVA) because the public case ships without them. Generator reactive limits are enforced except at the slack bus, which has to balance the system; its Q is shown against its limits but never pinned. Educational, not a planning tool.</p>
+  </footer>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

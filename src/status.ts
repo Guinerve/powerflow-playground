@@ -63,6 +63,6 @@ export function statusMessage(net: Network, sol: Solution): Status {
   }
   return {
     tone: "ok",
-    text: `${head} All voltages within the case's 0.94–1.06 pu limits, and every generator inside its reactive range.`,
+    text: `${head} All voltages within the case's 0.94–1.06 pu limits, and every voltage-controlling generator inside its reactive range.`,
   };
 }

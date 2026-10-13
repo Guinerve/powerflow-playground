@@ -1,22 +1,43 @@
 # Powerflow Playground
 
+An AC power flow solver that I wrote from scratch in TypeScript. It solves the IEEE 14-bus network in your browser each time you move a control.
+
 [![CI](https://github.com/Guinerve/powerflow-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/Guinerve/powerflow-playground/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Guinerve/powerflow-playground/actions/workflows/pages.yml/badge.svg)](https://guinerve.github.io/powerflow-playground/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A Newton–Raphson AC power-flow solver written from scratch in TypeScript, with generator reactive-power limits. It solves the IEEE 14-bus network in your browser every time you move a control.
+**[Open the live demo](https://guinerve.github.io/powerflow-playground/)**
 
-**[Open the live demo](https://guinerve.github.io/powerflow-playground/)** or run it locally with `npm install && npm run dev`.
+![The one-line diagram at 140% load with generator reactive limits on. All four voltage control generators sit at Qmax and bus 14 falls to 0.949 pu.](assets/screenshot.png)
 
-![Load sweep from 100% to 175% with reactive limits on, then the same 140% case with limits switched off](assets/demo.gif)
+I built this to show what happens inside a power flow study, and to check that I could get the numbers right without a library. The solver uses Newton's method in polar form. It enforces generator reactive limits by switching buses between PV and PQ. A test suite checks every bus against pandapower, an independent solver.
 
-The solver doesn't use a power-systems library. It has its own Ybus (π-model lines, off-nominal transformer taps, shunts), a full polar Jacobian, Gaussian elimination with partial pivoting, and an outer loop that switches generator buses between PV and PQ at their reactive limits. A test suite checks it against an independent solver, pandapower, at every bus.
+The solver has its own code for each part:
+
+- the bus admittance matrix (π model lines, transformer tap ratios and bus shunts)
+- the full polar Jacobian
+- Gaussian elimination with partial pivoting
+- an outer loop that switches generator buses between PV and PQ at their reactive limits
+
+## Quick start
+
+```bash
+npm install
+npm run dev      # http://localhost:5192
+```
+
+Open the page, then:
+
+1. Select a bus on the diagram.
+2. Move the slider to add generation or load at that bus.
+3. Move **System load** to scale every load in the case.
+4. Clear **Enforce generator reactive limits** to see the answer without limits.
 
 ## Worked scenario: 140% load and generator reactive limits
 
-Scale every load in the case to 140% (P and Q, generator MW unchanged, slack picks up the rest) and solve twice: once letting generators produce whatever reactive power it takes to hold their voltage set-points, and once holding them to their real Qmin–Qmax. Then solve the second case again in [pandapower](https://www.pandapower.org/) from the same `case14.m`.
+I scaled every load in the case to 140%, for both P and Q. Generator MW stays the same, so the slack supplies the rest. Then I solved the case two times. In the first solve, the generators make all the reactive power they need to hold their voltage setpoints. In the second solve, each generator stays inside its real Qmin to Qmax range. [pandapower](https://www.pandapower.org/) solved the second case again from the same `case14.m` file.
 
-![The worked scenario section of the page: comparison table and interpretation](assets/scenario.png)
+![The worked scenario section of the page: comparison table and reading](assets/scenario.png)
 
 | | Q limits off | Q limits on (this solver) | pandapower, limits on |
 |---|---:|---:|---:|
@@ -29,68 +50,84 @@ Scale every load in the case to 140% (P and Q, generator MW unchanged, slack pic
 | Losses | 28.97 MW | 30.42 MW | 30.42 MW |
 | Highest load the solver can still solve | ×4.00 | **×1.76** | |
 
-▲ is output beyond the machine's rating. The largest gap to pandapower over all 14 buses is 4.7e-9 pu in voltage, 5.2e-7° in angle and 2.5e-7 MVAr in generator output.
+▲ marks output above the rating of the machine. Over all 14 buses, the largest gap to pandapower is 4.7e-9 pu in voltage, 5.2e-7° in angle and 2.5e-7 MVAr in generator output.
 
-**What it shows.** With limits off the network looks healthy: the lowest voltage is 1.005 pu. But it gets there by asking the bus 2 generator for 88 MVAr from a 50 MVAr machine, and buses 3 and 6 for 41% more than they can give. Enforce the limits and all four voltage-controlling generators pin at Qmax. Only the slack is still regulating, so voltages sag across the network to 0.949 pu at bus 14, just inside the case's 0.94 pu floor. The slack swings from absorbing 30 MVAr to supplying 47 MVAr, and losses rise by 1.44 MW.
+**What it shows.** With limits off, the network looks healthy. The lowest voltage is 1.005 pu. But the bus 2 generator must make 88 MVAr, and its rating is 50 MVAr. The generators at buses 3 and 6 must each make 41% more than they can. With limits on, all four voltage control generators stop at Qmax. Only the slack still controls voltage, so voltages fall across the network. Bus 14 drops to 0.949 pu, just above the 0.94 pu floor of the case. The slack changes from absorbing 30 MVAr to supplying 47 MVAr, and losses rise by 1.44 MW.
 
-**Engineering reading.** At higher load this network runs short of reactive power first. At 150% bus 14 drops to 0.903 pu, a violation. With limits on, the solver finds no solution past ×1.76 load; with limits off it goes to ×4.00. A study that ignored Q limits would report a +300% load margin where this one finds about +76%. The remedy to study is reactive support near the load (switched capacitors or a STATCOM around buses 9–14), not just more generation.
+**Engineering reading.** At higher load, this network runs out of reactive power first. At 150% load, bus 14 falls to 0.903 pu, which is a violation. With limits on, the solver finds no solution above ×1.76 load. With limits off, it reaches ×4.00. A study that ignored Q limits would report a load margin of +300%, but this one finds about +76%. The fix to study is reactive support near the load, for example switched capacitors or a STATCOM near buses 9 to 14. More generation alone does not fix it.
 
-**What this leaves out.** At 140% the slack produces 353 MW against a 332.4 MW Pmax, so a real study would also redispatch real power. Line ratings are illustrative (see [Limits](#limits)), so a line near 100% on the diagram is not a finding. The "highest load" figures come from bisection on flat-start convergence. Near the nose of the PV curve that is how far the solver reaches, not a certified loadability limit.
+**What this leaves out.** At 140% load the slack makes 353 MW, and its Pmax is 332.4 MW. A real study would also move real power to other generators. The line ratings are illustrative (see [Limits](#limits)), so a line near 100% on the diagram is not a finding. I found the "highest load" values by bisection on convergence from a flat start. Near the nose of the PV curve, they show how far the solver reaches. They are not certified loadability limits.
 
-The page's **140% load** button loads this case into the diagram. Untick *Enforce generator reactive limits* to see the optimistic answer.
+On the page, the **140% load** button loads this case into the diagram.
+
+![Load sweep from 100% to 175% with reactive limits on, then the same 140% case with limits off](assets/demo.gif)
 
 ## How it works
 
 | File | What it does |
 |---|---|
-| [`src/model.ts`](src/model.ts) | Parses the MATPOWER case format (bus, gen, branch) into typed records |
-| [`src/ybus.ts`](src/ybus.ts) | Bus admittance matrix: π-model lines, off-nominal taps, bus shunts |
-| [`src/newton.ts`](src/newton.ts) | Newton–Raphson in polar form, branch flows, and the reactive-limit outer loop |
+| [`src/model.ts`](src/model.ts) | Reads the MATPOWER case format (bus, gen, branch) into typed records |
+| [`src/ybus.ts`](src/ybus.ts) | Builds the bus admittance matrix: π model lines, transformer taps, bus shunts |
+| [`src/newton.ts`](src/newton.ts) | Newton's method in polar form, branch flows and the reactive limit loop |
 | [`src/status.ts`](src/status.ts) | Turns a solution into the status banner |
 | [`src/scenario.ts`](src/scenario.ts) | The worked scenario and the loadability bisection |
-| [`src/main.ts`](src/main.ts) | One-line diagram (SVG), controls and charts |
+| [`src/main.ts`](src/main.ts) | The one-line diagram (SVG), the controls and the charts |
 | [`reference/generate.py`](reference/generate.py) | Builds the pandapower reference in `src/reference/case14.json` |
 
-**Reactive limits.** Pass `enforceQLimits: true` (the app's default; off by default in the API, as in MATPOWER and pandapower). After each converged solve, a PV bus whose generator needs more than Qmax or less than Qmin becomes a PQ bus with Q fixed at that limit, and the case is re-solved warm-started from the last answer. A limited bus goes back to PV if its voltage moves past its set-point in the direction that means it would have reactive power to spare. The loop stops when nothing changes, or after 20 passes, which counts as non-convergence. Several generators at one bus are pooled. The slack's Q is reported against its limits but never enforced, because something has to balance the system. The published base case itself has bus 1 absorbing 16.5 MVAr against a Qmin of 0.
+**Reactive limits.** In the API, set `enforceQLimits: true` to turn them on. They are off by default, as in MATPOWER and pandapower. The app turns them on by default.
 
-**When it doesn't converge.** The page says the solver failed and shows no numbers, and it says what failed: the mismatch grew, the Jacobian went singular, a voltage fell below 0.05 pu mid-iteration, or the iteration limit ran out. It doesn't claim more than that. A failed Newton solve from a flat start usually means the demand is past the nose of the PV curve, but it is not proof that no solution exists. A power flow also says nothing about dynamic stability, so the page never calls an operating point "stable" or "unstable".
+1. After each solve that converges, the solver checks each PV bus.
+2. If its generator needs more than Qmax or less than Qmin, the bus becomes a PQ bus with Q fixed at that limit.
+3. The solver solves the case again, starting from the last answer.
+4. A limited bus goes back to PV if its voltage moves past its setpoint in the direction that means it has spare reactive power.
+5. The loop stops when nothing changes. After 20 passes, it reports that the case did not converge.
 
-## How I know it's right
+The solver adds together the limits of all generators at one bus. It reports the slack Q against its limits but never enforces them, because the slack must balance the system. In the published base case, bus 1 already absorbs 16.5 MVAr against a Qmin of 0.
 
-`npm test` runs 29 tests in four files.
+**When it does not converge.** The page says that the solver failed and shows no numbers. It also gives the reason. For example:
 
-- **Published case.** The base case converges in 4 iterations, with max mismatch 9.2e-1 → 1.0e-1 → 7.1e-4 → 6.0e-8 → 7.1e-15 (quadratic). Total loss is 13.393 MW and slack output 232.39 MW, matching the published 13.393 and 232.4. Voltages are within 1.3e-3 pu of the solution column stored in the case file; the largest gap is bus 4, where the file holds the older IEEE value 1.019 and the converged answer is 1.0177 (MATPOWER prints 1.018).
-- **Independent solver.** Base case, 140% without limits, 140% with limits and 150% with limits each match pandapower 3.5.6 to 1e-6 pu at every bus. The measured gap is about 5e-9 pu. Angles match to 1e-4°, generator Q to 1e-3 MVAr, and slack power and losses to 1e-3 MW. The reference comes from the same `case14.m`, read by a separate parser in `reference/generate.py`.
-- **Hand calculations.** On a lossless two-bus line, P = V₁V₂ sin δ / x holds to 6 decimals. A PV bus holding 1.05 pu over x = 0.1 pu needs exactly 52.5 MVAr. Cap it at 20 MVAr and the voltage lands on the root of V² − V − 0.02 = 0. Cap a 0.9 pu set-point at −10 MVAr absorption and it lands on V² − V + 0.01 = 0, above the set-point it can't pull down to.
-- **Self-consistency.** Across a sweep from 50% to 160% load, every regulating generator is inside its band, every generator at Qmax sits at or below its set-point, and every one at Qmin at or above it.
-- **The numbers in this README.** `src/scenario.test.ts` asserts the scenario figures above, so if the solver changes them the build fails.
+- the mismatch grew
+- the Jacobian became singular
+- a voltage fell below 0.05 pu during the iterations
+- the iteration limit ran out
+- generators kept switching at their limits for 20 passes
 
-To regenerate the reference: `uv run --python 3.12 --with pandapower==3.5.6 python reference/generate.py`.
+A failed solve from a flat start often means the demand is past the nose of the PV curve. But it does not prove that no solution exists. A power flow also says nothing about dynamic stability, so the page never calls an operating point "stable" or "unstable".
 
-## Run it
+## How I know it is right
+
+`npm test` runs 38 tests in four files.
+
+- **Published case.** The base case converges in 4 iterations. The largest mismatch falls 0.92, 0.10, 7.1e-4, 6.0e-8, 7.1e-15 pu, which is quadratic. Total loss is 13.393 MW and slack output is 232.39 MW, against the published 13.393 and 232.4. Voltages are within 1.3e-3 pu of the solution stored in the case file. The largest gap is at bus 4: the file holds the older IEEE value of 1.019, and the solver gives 1.0177 (MATPOWER prints 1.018).
+- **Independent solver.** Four cases match pandapower 3.5.6 to 1e-6 pu at every bus: the base case, 140% without limits, 140% with limits and 150% with limits. The measured gap is about 5e-9 pu. Angles match to 1e-4°, generator Q to 1e-3 MVAr, and slack power and losses to 1e-3 MW. The reference uses the same `case14.m`, read by a separate parser in `reference/generate.py`.
+- **Hand calculations.** On a lossless line between two buses, P = V₁V₂ sin δ / x holds to 6 decimals. A PV bus that holds 1.05 pu over x = 0.1 pu needs exactly 52.5 MVAr. With a cap of 20 MVAr, its voltage lands on the root of V² − V − 0.02 = 0. A 0.9 pu setpoint with a cap of 10 MVAr absorption lands on the root of V² − V + 0.01 = 0. That voltage is above the setpoint, which the generator cannot reach.
+- **Self consistency.** In a sweep from 50% to 160% load, every regulating generator stays inside its range. Every generator at Qmax sits at or below its setpoint, and every generator at Qmin sits at or above it.
+- **The numbers in this README.** `src/scenario.test.ts` checks the scenario figures above. If the solver changes them, the build fails.
+
+To make the reference again:
 
 ```bash
-npm install
-npm run dev      # http://0.0.0.0:5192 (bound to all interfaces, so reachable over Tailscale)
-npm test
-npm run build    # static site in dist/
+uv run --python 3.12 --with pandapower==3.5.6 python reference/generate.py
 ```
 
-Pushes to `main` run the tests and deploy `dist/` to GitHub Pages.
+## Development
+
+```bash
+npm test         # 38 tests
+npm run build    # type check, then a static site in dist/
+npm run preview  # serve dist/ on port 5192
+```
+
+Each push to `main` runs the tests and deploys `dist/` to GitHub Pages.
 
 ## Limits
 
-- **Line ratings are illustrative**: 1.5× the base-case flow, at least 50 MVA, because the public case ships without ratings.
-- Generator real-power limits (Pmin/Pmax) are not enforced. Extra load goes to the slack.
-- Balanced, positive-sequence steady state only. No dynamics, faults, protection, tap changers or switched shunts.
-- Dense matrices and Gaussian elimination. That's fine for 14 buses but wouldn't scale to large networks.
-- Educational, not a planning tool.
-
-## Next
-
-- Contingency mode: click a line to trip it.
-- IEEE 30-bus case.
-- Continuation power flow, to trace the PV curve through the nose instead of bisecting on convergence.
+- **Line ratings are illustrative.** Each rating is 1.5× the base case flow, at least 50 MVA, because the public case has no ratings.
+- The solver does not enforce generator real power limits (Pmin and Pmax). The slack supplies all extra load.
+- It models a balanced, positive sequence steady state only. It has no dynamics, faults, protection, tap changers or switched shunts.
+- The parser refuses phase shifting transformers and skips elements that are out of service.
+- It uses dense matrices and Gaussian elimination. That is fine for 14 buses, but it would not scale to large networks.
+- It is for learning. Do not use it to plan a real network.
 
 ## Licence
 

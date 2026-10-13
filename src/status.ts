@@ -40,9 +40,9 @@ export function statusMessage(net: Network, sol: Solution): Status {
   if (!sol.converged) {
     return {
       tone: "bad",
-      text: `Newton–Raphson did not converge: ${sol.reason}. No numbers are shown. This usually means the ` +
-        `demand is beyond what the network can deliver (past the nose of its PV curve), but a failed solve ` +
-        `is not proof that no solution exists, and a power flow on its own says nothing about dynamic stability.`,
+      text: `The solver did not converge: ${sol.reason}. No numbers are shown. Often this means the demand is ` +
+        `more than the network can deliver (past the nose of its PV curve). But a failed solve is not proof ` +
+        `that no solution exists. A power flow also tells you nothing about dynamic stability.`,
     };
   }
   const head = `Converged in ${sol.iterations} iterations.`;
@@ -52,13 +52,13 @@ export function statusMessage(net: Network, sol: Solution): Status {
   const limited = controllable.filter((g) => g.state === "at Qmax" || g.state === "at Qmin");
   const overdrawn = controllable.filter((g) => !g.withinLimits);
   const reserve = limited.length
-    ? ` ${limited.length} of ${controllable.length} generators at their reactive limit (bus ${limited.map((g) => g.bus).join(", ")}).`
+    ? ` ${limited.length} of ${controllable.length} generators are at their reactive limit (bus ${limited.map((g) => g.bus).join(", ")}).`
     : "";
 
   if (outside(vmin) > V_TOL || outside(vmax) > V_TOL) {
     return {
       tone: "bad",
-      text: `${head} A bus voltage is outside the case's 0.94–1.06 pu limits (min ${vmin.toFixed(3)}, max ${vmax.toFixed(3)}).${reserve}`,
+      text: `${head} A bus voltage is outside the case limits of 0.94 to 1.06 pu (min ${vmin.toFixed(3)}, max ${vmax.toFixed(3)}).${reserve}`,
     };
   }
   if (overdrawn.length) {
@@ -72,12 +72,12 @@ export function statusMessage(net: Network, sol: Solution): Status {
   if (limited.length) {
     return {
       tone: "warn",
-      text: `${head} Voltages within the case's 0.94–1.06 pu limits, but ${limited.length} of ${controllable.length} ` +
-        `generators at their reactive limit (bus ${limited.map((g) => g.bus).join(", ")}): little or no reactive reserve left.`,
+      text: `${head} Voltages are inside the case limits of 0.94 to 1.06 pu. But ${limited.length} of ${controllable.length} ` +
+        `generators are at their reactive limit (bus ${limited.map((g) => g.bus).join(", ")}), so little or no reactive reserve is left.`,
     };
   }
   return {
     tone: "ok",
-    text: `${head} All voltages within the case's 0.94–1.06 pu limits, and every voltage-controlling generator inside its reactive range.`,
+    text: `${head} All voltages are inside the case limits of 0.94 to 1.06 pu. Every generator that controls voltage is inside its reactive range.`,
   };
 }

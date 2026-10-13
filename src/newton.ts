@@ -129,7 +129,7 @@ export function solvePowerFlow(net: Network, opts: Options = {}): Solution {
   let P: number[] = [];
   let Q: number[] = [];
 
-  /** One Newton–Raphson solve with the current bus types, warm-started from V and T. */
+  /** One Newton solve with the current bus types, warm-started from V and T. */
   const newton = (pass: number): { converged: boolean; reason?: string } => {
     const pvpq = types.map((t, i) => (t !== "slack" ? i : -1)).filter((i) => i >= 0);
     const pq = types.map((t, i) => (t === "PQ" ? i : -1)).filter((i) => i >= 0);
@@ -141,7 +141,7 @@ export function solvePowerFlow(net: Network, opts: Options = {}): Solution {
       if (!Number.isFinite(maxMis)) return { converged: false, reason: "the mismatch overflowed" };
       if (maxMis < tol) return { converged: true };
       if (it === maxIter) return { converged: false, reason: `still not converged after ${maxIter} iterations` };
-      if (it >= 4 && maxMis > 1e3) return { converged: false, reason: "the mismatch grew instead of shrinking" };
+      if (it >= 4 && maxMis > 1e3) return { converged: false, reason: "the mismatch grew instead of getting smaller" };
 
       const m = pvpq.length + pq.length;
       const J = Array.from({ length: m }, () => new Array<number>(m).fill(0));
@@ -179,7 +179,7 @@ export function solvePowerFlow(net: Network, opts: Options = {}): Solution {
       pvpq.forEach((i, r) => { T[i]! += dx[r]!; });
       pq.forEach((i, r) => { V[i]! += dx[pvpq.length + r]!; });
       if (pq.some((i) => V[i]! <= 0.05)) {
-        return { converged: false, reason: "a load-bus voltage fell below 0.05 pu mid-iteration" };
+        return { converged: false, reason: "a load bus voltage fell below 0.05 pu during the iterations" };
       }
     }
     return { converged: false, reason: "unreachable" };

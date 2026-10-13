@@ -61,8 +61,8 @@ function drawDiagram(net: Network, sol: Solution): void {
     const w = sol.converged ? 2.5 + Math.min(pct, 130) / 20 : 2;
     const col = sol.converged ? lineColor(pct) : "var(--idle)";
     const tip = sol.converged
-      ? `Line ${br.from}–${br.to}: ${fmt(Math.abs(f.pFrom))} MW, ${fmt(pct, 0)}% of an illustrative ${ratings[i]} MVA rating`
-      : `Line ${br.from}–${br.to}`;
+      ? `Line ${br.from} to ${br.to}: ${fmt(Math.abs(f.pFrom))} MW, ${fmt(pct, 0)}% of an illustrative ${ratings[i]} MVA rating`
+      : `Line ${br.from} to ${br.to}`;
     s += `<line class="branch" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w.toFixed(1)}"><title>${tip}</title></line>`;
     const ang = Math.atan2(y2 - y1, x2 - x1);
     const at = (t: number) => [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t] as const;
@@ -144,7 +144,7 @@ const qx = (q: number) => ((Math.min(Math.max(q, Q_MIN_AXIS), Q_MAX_AXIS) - Q_MI
 
 function drawGens(sol: Solution): void {
   const host = $("#gens");
-  if (!sol.converged) { host.innerHTML = `<p class="note">No solution, so no generator outputs.</p>`; return; }
+  if (!sol.converged) { host.innerHTML = `<p class="note">No solution, so the page shows no generator outputs.</p>`; return; }
   const rows = sol.gens.map((g) => {
     const tone = g.state === "regulating" ? "ok" : isLimited(g) ? "warn" : g.withinLimits ? "ok" : "bad";
     const state = genStateLabel(g);
@@ -183,7 +183,7 @@ function drawConvergence(sol: Solution): void {
     const idx = sol.log.flatMap((l, i) => (l.pass === p && Number.isFinite(lg[i]!) ? [i] : []));
     if (p > 0) {
       const bx = (x(idx[0]!) + x(idx[0]! - 1)) / 2;
-      s += `<line class="pass" x1="${bx}" x2="${bx}" y1="${T}" y2="${H - B}"/><text class="pass-label" x="${bx + 4}" y="${T + 9}">${p === 1 ? "limits applied, re-solve" : `pass ${p + 1}`}</text>`;
+      s += `<line class="pass" x1="${bx}" x2="${bx}" y1="${T}" y2="${H - B}"/><text class="pass-label" x="${bx + 4}" y="${T + 9}">${p === 1 ? "limits applied, solved again" : `pass ${p + 1}`}</text>`;
     }
     s += `<polyline class="series" points="${idx.map((i) => `${x(i).toFixed(1)},${y(lg[i]!).toFixed(1)}`).join(" ")}"/>`;
     s += idx.map((i) => `<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(lg[i]!).toFixed(1)}" r="4"><title>Pass ${p + 1}, iteration ${sol.log[i]!.iter}: ${sol.log[i]!.maxMismatch.toExponential(2)} pu</title></circle>`).join("");
@@ -256,21 +256,22 @@ function renderScenario(): void {
     row("Slack real power, MW", fmt(r.unlimited.slackMW), fmt(r.limited.slackMW), fmt(r.reference.slackMW)) +
     row("Losses, MW", fmt(r.unlimited.lossMW, 2), fmt(r.limited.lossMW, 2), fmt(r.reference.lossMW, 2)) +
     row("Highest load that still solves", `×${reachOff.toFixed(2)}`, `×${reachOn.toFixed(2)}`, "") +
-    `</tbody><tfoot><tr><td colspan="4">Largest gap to pandapower over all 14 buses: ` +
-    `${r.agreement.maxDeltaV.toExponential(1)} pu in voltage, ${r.agreement.maxDeltaDeg.toExponential(1)}° in angle, ` +
-    `${r.agreement.maxDeltaQ.toExponential(1)} MVAr in generator output. ▲ marks output beyond the machine's Qmax. ` +
-    `“Highest load” is found by bisection from a flat start: near the nose of the PV curve it is the solver's reach, not a certified limit.</td></tr></tfoot>`;
+    `</tbody><tfoot><tr><td colspan="4">The largest gap to pandapower over all 14 buses is ` +
+    `${r.agreement.maxDeltaV.toExponential(1)} pu in voltage, ${r.agreement.maxDeltaDeg.toExponential(1)}° in angle and ` +
+    `${r.agreement.maxDeltaQ.toExponential(1)} MVAr in generator output. ▲ marks output above the Qmax of the machine. ` +
+    `I found the “highest load” by bisection from a flat start. Near the nose of the PV curve, this shows how far the solver reaches. It is not a certified limit.</td></tr></tfoot>`;
 
   const g = Object.fromEntries(r.gens.map((x) => [x.bus, x]));
   const over = (b: number) => `${Math.round((g[b]!.unlimitedQ / g[b]!.qmax - 1) * 100)}%`;
+  const over36 = over(3) === over(6) ? `each run ${over(3)} above their rating` : `run ${over(3)} and ${over(6)} above their ratings`;
   $("#reading").innerHTML = `
-    <h3>The unconstrained answer looks fine, and isn't</h3>
-    <p>With limits off, the lowest voltage is <b>${r.unlimited.lowest.v.toFixed(3)} pu</b> and nothing looks wrong. But holding those set-points takes <b>${fmt(g[2]!.unlimitedQ)} MVAr</b> from the bus 2 generator, which is rated for ${g[2]!.qmax}, and buses 3 and 6 each run ${over(3)} over. No machine can do that. The healthy voltages are bought with reactive power that doesn't exist.</p>
+    <h3>The answer without limits looks fine, but it is wrong</h3>
+    <p>With limits off, the lowest voltage is <b>${r.unlimited.lowest.v.toFixed(3)} pu</b> and nothing looks wrong. But to hold those setpoints, the bus 2 generator must make <b>${fmt(g[2]!.unlimitedQ)} MVAr</b>, and its rating is ${g[2]!.qmax}. The generators at buses 3 and 6 ${over36}. No machine can do that. The good voltages depend on reactive power that does not exist.</p>
     <h3>With real limits, the reactive reserve is gone</h3>
-    <p>Enforce Qmin–Qmax and all four generators pin at their ceilings, so nothing but the slack is regulating voltage. Voltages sag across the network: bus ${r.limited.lowest.bus} falls to <b>${r.limited.lowest.v.toFixed(3)} pu</b>, just inside the 0.94 pu floor. The slack swings from absorbing ${fmt(-r.unlimited.slackQ)} MVAr to supplying ${fmt(r.limited.slackQ)} MVAr across the network, and losses rise by ${fmt(r.limited.lossMW - r.unlimited.lossMW, 2)} MW. pandapower lands on the same answer to within ${r.agreement.maxDeltaV.toExponential(0)} pu at every bus.</p>
-    <h3>What an engineer takes from it</h3>
-    <p>At higher load this network runs short of reactive power first. One more step, to 150%, puts bus ${r.nextStep.lowest.bus} at <b>${r.nextStep.lowest.v.toFixed(3)} pu</b>, a violation. The solver stops finding any solution past <b>×${reachOn.toFixed(2)}</b> load, against ×${reachOff.toFixed(2)} with limits ignored: a study that skipped Q limits would report a +${Math.round((reachOff - 1) * 100)}% load margin where this model finds about +${Math.round((reachOn - 1) * 100)}%. The fix to study is reactive support near the load (switched capacitors or a STATCOM around buses 9–14), not just more generation.</p>
-    <p class="caveat">What this study leaves out: the slack's ${fmt(r.limited.slackMW)} MW is above its ${base.gens[0]!.pmax} MW Pmax, so a real study would also redispatch real power; and the line ratings here are illustrative, so a line near 100% on the diagram is not a finding.</p>`;
+    <p>With limits on, all four generators stop at Qmax. Only the slack still controls voltage. Voltages fall across the network, and bus ${r.limited.lowest.bus} drops to <b>${r.limited.lowest.v.toFixed(3)} pu</b>, just above the 0.94 pu floor. The slack changes from absorbing ${fmt(-r.unlimited.slackQ)} MVAr to supplying ${fmt(r.limited.slackQ)} MVAr, and losses rise by ${fmt(r.limited.lossMW - r.unlimited.lossMW, 2)} MW. pandapower gets the same answer to within ${r.agreement.maxDeltaV.toExponential(0)} pu at every bus.</p>
+    <h3>What an engineer learns from it</h3>
+    <p>At higher load, this network runs out of reactive power first. At 150% load, bus ${r.nextStep.lowest.bus} falls to <b>${r.nextStep.lowest.v.toFixed(3)} pu</b>, which is a violation. With limits on, the solver finds no solution above <b>×${reachOn.toFixed(2)}</b> load. With limits off, it reaches ×${reachOff.toFixed(2)}. A study that ignored Q limits would report a load margin of +${Math.round((reachOff - 1) * 100)}%, but this model finds about +${Math.round((reachOn - 1) * 100)}%. The fix to study is reactive support near the load, for example switched capacitors or a STATCOM near buses 9 to 14. More generation alone does not fix it.</p>
+    <p class="caveat">What this study leaves out: the slack makes ${fmt(r.limited.slackMW)} MW, above its ${base.gens[0]!.pmax} MW Pmax, so a real study would also move real power to other generators. The line ratings are illustrative, so a line near 100% on the diagram is not a finding.</p>`;
 }
 
 busSel.addEventListener("change", update);

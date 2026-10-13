@@ -2,6 +2,7 @@
   "name": "powerflow-playground",
   "private": true,
   "version": "0.1.0",
+  "description": "An AC power flow solver written from scratch in TypeScript. It uses Newton's method with generator reactive limits on the IEEE 14-bus case.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5192 --strictPort",

@@ -28,14 +28,14 @@ describe("status banner", () => {
     const net = scaled(1);
     const m = statusMessage(net, solvePowerFlow(net, { enforceQLimits: true }));
     expect(m.tone).toBe("ok");
-    expect(m.text).toMatch(/0\.94–1\.06 pu/);
+    expect(m.text).toMatch(/0\.94 to 1\.06 pu/);
   });
 
   it("140% load: warns that every generator is at its reactive ceiling", () => {
     const net = scaled(1.4);
     const m = statusMessage(net, solvePowerFlow(net, { enforceQLimits: true }));
     expect(m.tone).toBe("warn");
-    expect(m.text).toMatch(/4 of 4 generators at their reactive limit/);
+    expect(m.text).toMatch(/4 of 4 generators are at their reactive limit/);
   });
 
   it("150% load: a load-bus voltage is out of limits", () => {
